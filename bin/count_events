@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Event Counter CLI Tool
+======================
+
+Description:
+    This script is a command-line wrapper for the 'event_counter' library.
+    It recursively scans directories or accepts specific file paths to count 
+    the total number of entries in a ROOT TTree (e.g., "Events").
+
+Mechanism:
+    1. Path Resolution: It takes input arguments (files or directories). 
+       - If a directory is provided, it recursively searches for all '*.root' files.
+       - If a file is provided, it validates its existence.
+    2. Lazy Loading: It uses the 'uproot' library to read only the file headers (metadata).
+       This is significantly faster than opening the full file or using ROOT/PyROOT.
+    3. Aggregation: It iterates through all valid files, sums the entries of the 
+       specified TTree, and prints the grand total.
+
+Usage Examples:
+    # 1. Count events in a single file
+    count_events data.root
+
+    # 2. recursively scan a directory
+    count_events /data/storage/2024_Samples/
+
+    # 3. Scan multiple specific locations with a specific Tree name
+    count_events ./output_v1/ ./output_v2/ --tree Runs
+
+    # 4. Verbose output (show count per file) - implemented via logging in library
+    #    (Modify logging level in library if needed)
+
+Dependencies:
+    - python3
+    - uproot (pip install uproot)
+"""
+
+import sys
+import argparse
+from pathlib import Path
+
+# ------------------------------------------------------------------------------
+# Dynamic Path Setup
+# Adds the project's 'lib' directory to sys.path to import modules.
+# ------------------------------------------------------------------------------
+script_path = Path(__file__).resolve()     # .../Toolbox/bin/count_events
+toolbox_root = script_path.parent.parent   # .../Toolbox/
+lib_path = toolbox_root / "lib"
+
+if str(lib_path) not in sys.path:
+    sys.path.insert(0, str(lib_path))
+# ------------------------------------------------------------------------------
+
+try:
+    import event_counter
+except ImportError:
+    print("[Error] Could not import 'event_counter'. Please check 'lib/' directory.")
+    sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Recursively count events in ROOT files using Uproot."
+    )
+    
+    # Input arguments
+    parser.add_argument(
+        "inputs", 
+        nargs='+', 
+        help="Input files or directories (e.g., ./data/ file.root)"
+    )
+    
+    # Optional arguments
+    parser.add_argument(
+        "--tree", "-t", 
+        default="Events", 
+        help="Name of the TTree to count (default: Events)"
+    )
+
+    args = parser.parse_args()
+
+    # 1. Expand paths (Logic from library)
+    #    This handles recursive directory scanning and file validation.
+    target_files = event_counter.expand_file_paths(args.inputs)
+    
+    if not target_files:
+        print("[Error] No ROOT files found in the provided paths.")
+        sys.exit(1)
+
+    print("-" * 50)
+    print(f"Target Tree  : {args.tree}")
+    print(f"Files Found  : {len(target_files)}")
+    print("-" * 50)
+
+    # 2. Run Counter (Logic from library)
+    counter = event_counter.EventCounter(tree_name=args.tree)
+    grand_total = counter.count(target_files)
+
+    # 3. Final Output
+    print("=" * 50)
+    print(f" GRAND TOTAL : {grand_total}")
+    print("=" * 50)
+
+if __name__ == "__main__":
+    main()

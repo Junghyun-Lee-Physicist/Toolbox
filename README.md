@@ -1,7 +1,9 @@
+````
 # Toolbox
+
 **Collection of scripts and execution files for HEP analysis.**
 
-This repository serves as a personal toolkit for High Energy Physics (HEP) data analysis. It contains lightweight Python modules, shell scripts, and utilities designed to be easily integrated into any workflow without heavy dependencies.
+This repository serves as a personal toolkit for High Energy Physics (HEP) data analysis. It creates a unified environment for Python modules, shell scripts, and binaries without heavy dependencies.
 
 ## 📂 Directory Structure
 
@@ -13,13 +15,17 @@ Toolbox/
 ├── requirements.txt     # Python dependencies list
 ├── setup.sh             # Environment setup script
 └── README.md            # Project documentation
-```
+````
 
 ## 🚀 Environment Setup
-1. Python Virtual Environment (One-time Setup)
-To isolate dependencies, it is recommended to create a virtual environment named `toolBoxVirEnv`.
 
-	Note: If you already have the required modules installed, are working within a **configured CMSSW environment**, or simply do not need a virtual environment, **you can skip this step**.
+### 1. Python Virtual Environment (Optional)
+
+To isolate dependencies, it is recommended to create a virtual environment.
+
+> **Note:** If you are working within a **configured CMSSW environment** or already have the required modules, **you can skip this step.**
+
+Bash
 
 ```
 # 1. Create the virtual environment
@@ -32,37 +38,62 @@ source toolBoxVirEnv/bin/activate
 pip install -r requirements.txt
 ```
 
-2. Loading the Environment (Daily Usage)
-The `setup.sh` script automatically handles environment variables and virtual environment activation.
+### 2. Loading the Environment
 
-Standard Usage: Activates `toolBoxVirEnv` (if it exists) and sets up `PATH` & `PYTHONPATH`.
+The `setup.sh` script automatically handles environment variables (PATH, PYTHONPATH) and virtual environment activation.
 
-```bash
+**Standard Usage:** Activates `toolBoxVirEnv` (if it exists) and sets up paths.
+
+Bash
+
+```
 source setup.sh
 ```
 
-Without Virtual Environment: If you want to use the system Python or a different environment, use the `--no-venv` flag. This only sets up the directory paths.
-```bash
+**Without Virtual Environment:** Use this if you rely on system Python or CMSSW environment.
+
+Bash
+
+```
 source setup.sh --no-venv
 ```
 
-3. Deactivating the Environment
-When you are done with your work, you can exit the virtual environment using the standard command:
-```bash
-deactivate
-```
+---
 
-Note: `deactivate` only exits the Python virtual environment. The `PATH` and `PYTHONPATH` changes made by `setup.sh` will persist until you close the current terminal session.
+## 🛠 Included Tools & Usage
 
-📝 Usage Examples
-- Python: You can import modules inside `lib/` directly.
+### 1. `count_events`
 
-```python
-import my_analysis_tools
-```
+A fast CLI utility to recursively scan directories and count entries in ROOT TTrees. It uses `uproot` for rapid metadata access without opening the full file.
 
-- Shell: You can run executables inside bin/ from any directory.
+- **Dependencies:**
+    
+    - `uproot >= 5.0.0`
+        
+    - `awkward >= 2.0.0`
+        
+    - _(Install via `pip install -r requirements.txt`)_
+        
+- **Usage:** Ensure the script is executable: `chmod +x bin/count_events`
+    
+    Bash
+    
+    ```
+    # A. Recursive scan of a directory
+    count_events /data/store/user/sample_2017/
+    
+    # B. Count specific files
+    count_events file1.root file2.root
+    
+    # C. Count a specific Tree (default is 'Events')
+    count_events ./output/ --tree Runs
+    ```
+    
 
-```bash
-run_cms_job.sh --option 1
-```
+### 2. (Future Tools...)
+
+- **Description:** ...
+    
+- **Dependencies:** ...
+    
+- **Usage:** ...
