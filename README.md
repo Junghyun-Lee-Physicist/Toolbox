@@ -13,6 +13,7 @@ Toolbox/
 ├── requirements.txt     # Python dependencies list
 ├── setup.sh             # Environment setup script
 └── README.md            # Project documentation
+```
 
 ## 🚀 Environment Setup
 1. Python Virtual Environment (One-time Setup)
@@ -20,7 +21,7 @@ To isolate dependencies, it is recommended to create a virtual environment named
 
 	Note: If you already have the required modules installed, are working within a **configured CMSSW environment**, or simply do not need a virtual environment, **you can skip this step**.
 
-```bash
+```
 # 1. Create the virtual environment
 python3 -m venv toolBoxVirEnv
 
