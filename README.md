@@ -64,36 +64,28 @@ source setup.sh --no-venv
 
 ### 1. `count_events`
 
-A fast CLI utility to recursively scan directories and count entries in ROOT TTrees. It uses `uproot` for rapid metadata access without opening the full file.
+* **Dependencies:**
+    * `uproot >= 5.0.0`
+    * `awkward >= 2.0.0`
+    * *(Install via `pip install -r requirements.txt`)*
 
-- **Dependencies:**
+* **Usage:**
+    Ensure the script is executable: `chmod +x bin/count_events`
     
-    - `uproot >= 5.0.0`
-        
-    - `awkward >= 2.0.0`
-        
-    - _(Install via `pip install -r requirements.txt`)_
-        
-- **Usage:** Ensure the script is executable: `chmod +x bin/count_events`
-    
-    Bash
-    
-    ```
-    # A. Recursive scan of a directory
+    ```bash
+    # A. Single Directory (Recursive)
     count_events /data/store/user/sample_2017/
-    
-    # B. Count specific files
-    count_events file1.root file2.root
-    
-    # C. Count a specific Tree (default is 'Events')
+
+    # B. Multiple Inputs (Separate reports for each)
+    count_events TTHH_TuneCP5 TTTT_TuneCP5
+    # Output:
+    #   [OK] TTHH_TuneCP5 -- file1.root: 500
+    #   ...
+    #   Summary for TTHH_TuneCP5: 15000
+    #   ...
+    #   Summary for TTTT_TuneCP5: 12000
+    #   GRAND TOTAL: 27000
+
+    # C. Specific Tree
     count_events ./output/ --tree Runs
     ```
-    
-
-### 2. (Future Tools...)
-
-- **Description:** ...
-    
-- **Dependencies:** ...
-    
-- **Usage:** ...

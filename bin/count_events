@@ -7,34 +7,34 @@ Event Counter CLI Tool
 
 Description:
     This script is a command-line wrapper for the 'event_counter' library.
-    It recursively scans directories or accepts specific file paths to count 
-    the total number of entries in a ROOT TTree (e.g., "Events").
+    It processes multiple input paths independently, providing both 
+    per-directory event counts and a final grand total.
 
 Mechanism:
-    1. Path Resolution: It takes input arguments (files or directories). 
-       - If a directory is provided, it recursively searches for all '*.root' files.
-       - If a file is provided, it validates its existence.
-    2. Lazy Loading: It uses the 'uproot' library to read only the file headers (metadata).
-       This is significantly faster than opening the full file or using ROOT/PyROOT.
-    3. Aggregation: It iterates through all valid files, sums the entries of the 
-       specified TTree, and prints the grand total.
+    1. Environment Reliance: It assumes 'lib/' is in PYTHONPATH (set via setup.sh).
+    2. Grouped Processing: It iterates through each input argument separately.
+    3. Lazy Loading: It uses 'uproot' via the library to read metadata fast.
 
 Usage Examples:
-    # 1. Count events in a single file
-    count_events data.root
+    # 1. Separate reporting for each directory
+    count_events ./TTTo2L2Nu ./TTToSemiLeptonic
 
-    # 2. recursively scan a directory
-    count_events /data/storage/2024_Samples/
+    # Output format:
+    #   [INFO] Scanning directory...
+    #   [INFO]   [OK] TTTo2L2Nu -- file1.root: 1000 events
+    #   ...
+    #   --------------------------------------------------
+    #    Summary for  : TTTo2L2Nu
+    #    Total Events : 50000
+    #   --------------------------------------------------
 
-    # 3. Scan multiple specific locations with a specific Tree name
-    count_events ./output_v1/ ./output_v2/ --tree Runs
-
-    # 4. Verbose output (show count per file) - implemented via logging in library
-    #    (Modify logging level in library if needed)
+    # 2. Specific Tree in a specific folder
+    count_events /data/store/user/2017/ --tree Runs
 
 Dependencies:
     - python3
     - uproot (pip install uproot)
+    - Source 'setup.sh' before running this script.
 """
 
 import sys
@@ -42,33 +42,28 @@ import argparse
 from pathlib import Path
 
 # ------------------------------------------------------------------------------
-# Dynamic Path Setup
-# Adds the project's 'lib' directory to sys.path to import modules.
+# Import Logic
+# Relies on PYTHONPATH set by 'source setup.sh'
 # ------------------------------------------------------------------------------
-script_path = Path(__file__).resolve()     # .../Toolbox/bin/count_events
-toolbox_root = script_path.parent.parent   # .../Toolbox/
-lib_path = toolbox_root / "lib"
-
-if str(lib_path) not in sys.path:
-    sys.path.insert(0, str(lib_path))
-# ------------------------------------------------------------------------------
-
 try:
     import event_counter
 except ImportError:
-    print("[Error] Could not import 'event_counter'. Please check 'lib/' directory.")
+    print("\n[Error] Could not import 'event_counter'.")
+    print("Did you run 'source setup.sh'? Please load the environment first.")
+    print(" (If you are developing, ensure 'lib/' is in your PYTHONPATH)\n")
     sys.exit(1)
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Recursively count events in ROOT files using Uproot."
+        description="Recursively count events in ROOT files with grouped reporting."
     )
     
     # Input arguments
     parser.add_argument(
         "inputs", 
         nargs='+', 
-        help="Input files or directories (e.g., ./data/ file.root)"
+        help="Input files or directories (separate multiple inputs with space)"
     )
     
     # Optional arguments
@@ -79,28 +74,55 @@ def main():
     )
 
     args = parser.parse_args()
-
-    # 1. Expand paths (Logic from library)
-    #    This handles recursive directory scanning and file validation.
-    target_files = event_counter.expand_file_paths(args.inputs)
     
-    if not target_files:
-        print("[Error] No ROOT files found in the provided paths.")
-        sys.exit(1)
-
-    print("-" * 50)
-    print(f"Target Tree  : {args.tree}")
-    print(f"Files Found  : {len(target_files)}")
-    print("-" * 50)
-
-    # 2. Run Counter (Logic from library)
+    grand_total = 0
+    total_files_processed = 0
+    
+    # Instantiate counter
     counter = event_counter.EventCounter(tree_name=args.tree)
-    grand_total = counter.count(target_files)
 
-    # 3. Final Output
-    print("=" * 50)
-    print(f" GRAND TOTAL : {grand_total}")
-    print("=" * 50)
+    print(f"\nTarget Tree: '{args.tree}'\n")
+
+    # ---------------------------------------------------------
+    # Process each input argument separately
+    # ---------------------------------------------------------
+    for input_path in args.inputs:
+        path_obj = Path(input_path)
+        # Use filename as label (e.g., directory name)
+        label = path_obj.name 
+
+        # 1. Expand files for THIS input only
+        target_files = event_counter.expand_file_paths([input_path])
+        
+        if not target_files:
+            print(f"[Warning] No ROOT files found in: {input_path}")
+            continue
+            
+        # 2. Run Counter for this batch
+        # 'label' is used for logging prefix (e.g. "[OK] label -- file.root")
+        sub_total = counter.count(target_files, label=label)
+        
+        # 3. Print Sub-summary
+        print("-" * 50)
+        print(f" Summary for  : {label}")
+        print(f" Files Found  : {len(target_files)}")
+        print(f" Total Events : {sub_total}")
+        print("-" * 50 + "\n")
+        
+        # Accumulate
+        grand_total += sub_total
+        total_files_processed += len(target_files)
+
+    # ---------------------------------------------------------
+    # Final Grand Total (Only show if multiple inputs were given)
+    # ---------------------------------------------------------
+    if len(args.inputs) > 1:
+        print("=" * 50)
+        print(f" GRAND TOTAL Summary")
+        print(f" Inputs Processed : {len(args.inputs)}")
+        print(f" Total Files      : {total_files_processed}")
+        print(f" Total Events     : {grand_total}")
+        print("=" * 50)
 
 if __name__ == "__main__":
     main()

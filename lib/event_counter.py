@@ -9,27 +9,19 @@ Description:
 Features:
     - Fast metadata reading (lazy loading).
     - Recursive directory scanning.
-    - Specific file targeting.
+    - Grouped reporting by input label.
 
 Dependencies:
     - uproot >= 5.0.0
-    - awkward >= 2.0.0 (usually installed with uproot)
+    - awkward >= 2.0.0
 
 Usage as Library:
-    -------------------------------------------------------------------
     from event_counter import EventCounter, expand_file_paths
 
-    # 1. Get list of files (handles recursion automatically)
-    files = expand_file_paths(["./data", "./output/test.root"])
-
-    # 2. Count events
-    counter = EventCounter(tree_name="Events")
-    total = counter.count(files)
-    print(f"Total events: {total}")
-    -------------------------------------------------------------------
-
-Usage as Script:
-    python event_counter.py ./data/ --tree Events
+    # Count with a label for logging context
+    files = expand_file_paths(["./data"])
+    counter = EventCounter("Events")
+    total = counter.count(files, label="MyDataSample")
 """
 
 import uproot
@@ -37,7 +29,7 @@ import logging
 import argparse
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 # Configure logging to stdout
 logging.basicConfig(
@@ -79,14 +71,25 @@ class EventCounter:
     def __init__(self, tree_name: str = "Events"):
         self.tree_name = tree_name
 
-    def count(self, file_paths: List[Path]) -> int:
+    def count(self, file_paths: List[Path], label: Optional[str] = None) -> int:
+        """
+        Iterates over the file list and sums up the entries in the target Tree.
+        
+        Args:
+            file_paths: List of Path objects to read.
+            label: (Optional) A string label (e.g., directory name) to prefix in logs.
+        
+        Returns:
+            int: Total events for this batch.
+        """
         total_events = 0
         
         if not file_paths:
             logger.warning("No files provided to count.")
             return 0
 
-        logger.info(f"Starting count for Tree: '{self.tree_name}'")
+        # Format label for logging
+        log_prefix = f"{label} -- " if label else ""
         
         for file_path in file_paths:
             try:
@@ -95,21 +98,24 @@ class EventCounter:
                     if self.tree_name in f:
                         n_entries = f[self.tree_name].num_entries
                         total_events += n_entries
-                        logger.info(f"  [OK] {file_path.name}: {n_entries} events")
+                        logger.info(f"  [OK] {log_prefix}{file_path.name}: {n_entries} events")
                     else:
-                        logger.warning(f"  [SKIP] Tree '{self.tree_name}' not found in {file_path.name}")
+                        logger.warning(f"  [SKIP] {log_prefix}Tree '{self.tree_name}' not found in {file_path.name}")
             
             except Exception as e:
-                logger.error(f"  [ERR] Failed to read {file_path.name}: {e}")
+                logger.error(f"  [ERR] {log_prefix}Failed to read {file_path.name}: {e}")
 
         return total_events
 
 if __name__ == "__main__":
+    # Library execution block (simple usage)
     parser = argparse.ArgumentParser(description="Recursively count events in ROOT files.")
     parser.add_argument("inputs", nargs='+', help="Input files or directories")
     parser.add_argument("--tree", "-t", default="Events", help="Target TTree name")
     
     args = parser.parse_args()
+    
+    # Process all inputs at once (flat behavior for simple script usage)
     target_files = expand_file_paths(args.inputs)
     
     if not target_files:
@@ -117,7 +123,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     counter = EventCounter(tree_name=args.tree)
-    grand_total = counter.count(target_files)
+    grand_total = counter.count(target_files, label="Input")
     
     print("=" * 50)
     print(f" GRAND TOTAL : {grand_total}")
