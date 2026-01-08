@@ -14,4 +14,4 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Python virtual environment
-toolBoxVirEnv
+toolBoxVirEnv/
