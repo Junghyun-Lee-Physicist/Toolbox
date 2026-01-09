@@ -111,3 +111,33 @@ source setup.sh --no-venv
     # C. Specific Tree
     count_events ./output/ --tree Runs
     ```
+
+### 2. `get_file_lists`
+A utility to fetch file lists (PFN with XRootD redirector) from CMS DAS. It supports both custom dataset inputs and a built-in central MC list.
+
+* **Dependencies:**
+    * `dasgoclient` (Must be in PATH, typically via `cmsenv`)
+    * Valid VOMS Proxy (`voms-proxy-init --voms cms -rfc`)
+
+* **Usage:**
+    Ensure the script is executable: `chmod +x bin/get_file_lists`
+
+    **A. Custom Dataset Input (Flexible Mode)**
+    Provide dataset Alias and Path directly as arguments (`Alias=Path`).
+    ```bash
+    # Syntax: get_file_lists Alias=DatasetPath ...
+    
+    get_file_lists \
+      TT4b=/TT4b_TuneCP5_13TeV_madgraph/RunII.../NANOAODSIM \
+      MySignal=/MySignal_M-500/RunII.../NANOAODSIM
+    ```
+
+    **B. Using Built-in Central List (Preset Mode)**
+    Use the `--central` flag to use the predefined dictionary in the script.
+    ```bash
+    # 1. Process ALL built-in datasets
+    get_file_lists --central
+
+    # 2. Process specific keys from the built-in list
+    get_file_lists --central TTbar_SemiLep QCD_HT1500to2000_MLM
+    ```

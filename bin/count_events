@@ -41,16 +41,24 @@ import sys
 import argparse
 from pathlib import Path
 
-# ------------------------------------------------------------------------------
-# Import Logic
-# Relies on PYTHONPATH set by 'source setup.sh'
-# ------------------------------------------------------------------------------
+script_path = Path(__file__).resolve()     # .../Toolbox/bin/count_events
+toolbox_root = script_path.parent.parent   # .../Toolbox/
+lib_path = toolbox_root / "lib"
+
+# Insert lib path at the VERY BEGINNING of sys.path
+if str(lib_path) not in sys.path:
+    sys.path.insert(0, str(lib_path))
+
 try:
     import event_counter
-except ImportError:
-    print("\n[Error] Could not import 'event_counter'.")
-    print("Did you run 'source setup.sh'? Please load the environment first.")
-    print(" (If you are developing, ensure 'lib/' is in your PYTHONPATH)\n")
+except ImportError as e:
+    # If it fails even after injection, print debug info
+    print(f"\n[Critical Error] Could not import 'event_counter'.")
+    print(f"Debug Info:")
+    print(f"  - Script Location: {script_path}")
+    print(f"  - Expected Lib Path: {lib_path}")
+    print(f"  - sys.path[0]: {sys.path[0]}")
+    print(f"  - Error Detail: {e}\n")
     sys.exit(1)
 
 

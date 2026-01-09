@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+CMS File List Generator
+=======================
+Description:
+    Fetches file lists for CMS datasets using DAS.
+    
+Usage:
+    1. Custom Input:
+       get_file_lists Label1=/Dataset/Path1 Label2=/Dataset/Path2 ...
+       
+    2. Use Built-in Central List:
+       get_file_lists --central                 # Process ALL internal samples
+       get_file_lists --central TT4b TTTo2L2Nu  # Process specific keys from internal list
+"""
+
+import sys
+import os
+import argparse
+import subprocess
+from pathlib import Path
+
+# ------------------------------------------------------------------------------
+# [Path Injection] Force load 'lib/' directory
+# ------------------------------------------------------------------------------
+script_path = Path(__file__).resolve()
+toolbox_root = script_path.parent.parent
+lib_path = toolbox_root / "lib"
+
+if str(lib_path) not in sys.path:
+    sys.path.insert(0, str(lib_path))
+# ------------------------------------------------------------------------------
+
+try:
+    import dataset_query
+except ImportError as e:
+    print(f"\n[Critical Error] Could not import 'dataset_query'.")
+    print(f"Debug Info: {e}\n")
+    sys.exit(1)
+
+# ------------------------------------------------------------------------------
+# Central MC Sample Database (Built-in)
+# ------------------------------------------------------------------------------
+CENTRAL_MC_SAMPLES = {
+    # ==============================================================================
+    # 1. Signal & Rare Top / Higgs Processes (Short Alias)
+    # ==============================================================================
+    "TTHHto4b": "/TTHHTo4b_TuneCP5_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "TTZHTo4b": "/TTZHTo4b_TuneCP5_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "TTZZTo4b": "/TTZZTo4b_TuneCP5_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "TT4b": "/TT4b_TuneCP5_13TeV_madgraph_pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "ttHTobb": "/ttHTobb_M125_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "TTZToBB": "/TTZToBB_TuneCP5_13TeV-amcatnlo-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    
+    # ==============================================================================
+    # 2. Key Backgrounds [ TTbar ] (Short Alias)
+    # ==============================================================================
+    "TTbar_SemiLep": "/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "TTbar_Hadronic": "/TTToHadronic_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "TTbar_DiLep": "/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    
+    # TTJets (Inclusive)
+    "TTJets_amcatnlo": "/TTJets_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "TTJets_madgraph": "/TTJets_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+
+    # ==============================================================================
+    # 3. Multi-Boson / Rare (Short Alias)
+    # ==============================================================================
+    "TTWW": "/TTWW_TuneCP5_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "TTWH": "/TTWH_TuneCP5_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "TTWZ": "/TTWZ_TuneCP5_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "TTTW": "/TTTW_TuneCP5_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "TTTT": "/TTTT_TuneCP5_13TeV-amcatnlo-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "TTbb_4f": "/TTbb_4f_TTToHadronic_TuneCP5-Powheg-Openloops-Pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    
+    # ==============================================================================
+    # 4. QCD (HT Binned) - madgraphMLM (From YAML List)
+    # ==============================================================================
+    "QCD_HT200to300_MLM": "/QCD_HT200to300_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT300to500_MLM": "/QCD_HT300to500_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT500to700_MLM": "/QCD_HT500to700_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT700to1000_MLM": "/QCD_HT700to1000_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT1000to1500_MLM": "/QCD_HT1000to1500_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT1500to2000_MLM": "/QCD_HT1500to2000_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT2000toInf_MLM": "/QCD_HT2000toInf_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+
+    # ==============================================================================
+    # 5. QCD (HT Binned) - PSWeights_madgraph (From CSV List)
+    # ==============================================================================
+    "QCD_HT100to200_PSWeights": "/QCD_HT100to200_TuneCP5_PSWeights_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT200to300_PSWeights": "/QCD_HT200to300_TuneCP5_PSWeights_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT300to500_PSWeights": "/QCD_HT300to500_TuneCP5_PSWeights_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT500to700_PSWeights": "/QCD_HT500to700_TuneCP5_PSWeights_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT700to1000_PSWeights": "/QCD_HT700to1000_TuneCP5_PSWeights_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT1000to1500_PSWeights": "/QCD_HT1000to1500_TuneCP5_PSWeights_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT1500to2000_PSWeights": "/QCD_HT1500to2000_TuneCP5_PSWeights_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "QCD_HT2000toInf_PSWeights": "/QCD_HT2000toInf_TuneCP5_PSWeights_13TeV-madgraph-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+
+    # ==============================================================================
+    # 6. WJets & DYJets
+    # ==============================================================================
+    "WJetsToLNu_amcatnlo": "/WJetsToLNu_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v2/NANOAODSIM",
+    "WJetsToLNu_madgraph": "/WJetsToLNu_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "WJetsToLNu_madgraph_ext1": "/WJetsToLNu_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9_ext1-v2/NANOAODSIM",
+    
+    "DYJetsToLL_M-50_madgraph": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "DYJetsToLL_M-50_madgraph_ext1": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9_ext1-v1/NANOAODSIM",
+    "DYJetsToLL_M-10to50_amcatnlo": "/DYJetsToLL_M-10to50_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "DYJetsToLL_M-10to50_madgraph": "/DYJetsToLL_M-10to50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+
+    # ==============================================================================
+    # 7. Single Top
+    # ==============================================================================
+    "ST_tW_antitop": "/ST_tW_antitop_5f_NoFullyHadronicDecays_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "ST_tW_top": "/ST_tW_top_5f_NoFullyHadronicDecays_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "ST_s-channel": "/ST_s-channel_4f_leptonDecays_TuneCP5_13TeV-amcatnlo-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "ST_t-channel_top": "/ST_t-channel_top_4f_InclusiveDecays_TuneCP5_13TeV-powheg-madspin-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "ST_t-channel_antitop": "/ST_t-channel_antitop_4f_InclusiveDecays_TuneCP5_13TeV-powheg-madspin-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    
+    # ==============================================================================
+    # 8. Standard Diboson
+    # ==============================================================================
+    "WW": "/WW_TuneCP5_13TeV-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "WZ": "/WZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "ZZ": "/ZZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+
+    # ==============================================================================
+    # 9. TTX (Associated Production)
+    # ==============================================================================
+    "TTZToQQ_amcatnlo": "/TTZToQQ_TuneCP5_13TeV-amcatnlo-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "TTZToQQ_amcatnlo_v3": "/TTZToQQ_TuneCP5_13TeV_amcatnlo-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v3/NANOAODSIM",
+    "TTZToLLNuNu": "/TTZToLLNuNu_M-10_TuneCP5_13TeV-amcatnlo-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "TTWJetsToLNu": "/TTWJetsToLNu_TuneCP5_13TeV-amcatnloFXFX-madspin-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+    "TTWJetsToQQ": "/TTWJetsToQQ_TuneCP5_13TeV-amcatnloFXFX-madspin-pythia8/RunIISummer20UL17NanoAODv9-106X_mc2017_realistic_v9-v1/NANOAODSIM",
+}
+
+def check_voms_proxy():
+    """Checks if a valid VOMS proxy exists."""
+    print(">>> [Check] Verifying VOMS Proxy...")
+    try:
+        subprocess.run(
+            ["voms-proxy-info", "-exists"], 
+            check=True, 
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("\n[Error] VOMS Proxy not found. Please run: voms-proxy-init --voms cms -rfc")
+        return False
+
+def parse_custom_args(args_list):
+    """Parses list of strings in format 'Alias=Path' or 'Alias:Path'."""
+    targets = {}
+    for item in args_list:
+        # Support both '=' and ':' as separators
+        if "=" in item:
+            key, val = item.split("=", 1)
+        elif ":" in item:
+            key, val = item.split(":", 1)
+        else:
+            print(f"[Warning] Invalid format '{item}'. Use 'Alias=DatasetPath'. Skipping.")
+            continue
+        
+        # Clean up whitespace/quotes just in case
+        key = key.strip().strip('"').strip("'")
+        val = val.strip().strip('"').strip("'")
+        targets[key] = val
+    return targets
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Fetch file lists from DAS.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    
+    parser.add_argument(
+        "inputs", 
+        nargs="*", 
+        help="Custom datasets in format: Alias=DatasetPath\n"
+             "Example: MySample=/MyDataset/RunII/NANOAODSIM"
+    )
+    
+    parser.add_argument(
+        "--output", "-o", 
+        default="filelists", 
+        help="Directory to save the text files (default: filelists)"
+    )
+    
+    parser.add_argument(
+        "--central", "-c", 
+        action="store_true", 
+        help="Use the built-in Central MC sample list.\n"
+             "If inputs are provided with this flag, they function as filters (Keys)."
+    )
+    
+    args = parser.parse_args()
+
+    # 1. Check VOMS
+    if not check_voms_proxy():
+        sys.exit(1)
+
+    targets = {}
+
+    # 2. Logic Branching
+    if args.central:
+        # Mode A: Use Internal List
+        print(">>> [Mode] Using Built-in Central MC List.")
+        if args.inputs:
+            # Filter specific keys
+            print(f">>> [Filter] Selecting {len(args.inputs)} keys from central list...")
+            for key in args.inputs:
+                if key in CENTRAL_MC_SAMPLES:
+                    targets[key] = CENTRAL_MC_SAMPLES[key]
+                else:
+                    print(f"[Warning] Key '{key}' not found in central samples.")
+        else:
+            # Use ALL keys
+            targets = CENTRAL_MC_SAMPLES
+    else:
+        # Mode B: Custom Inputs
+        if not args.inputs:
+            parser.print_help()
+            print("\n[Error] No inputs provided. Provide 'Alias=Path' or use '--central'.")
+            sys.exit(1)
+        
+        print(">>> [Mode] Parsing Custom Inputs.")
+        targets = parse_custom_args(args.inputs)
+
+    if not targets:
+        print("[Error] No valid targets to process.")
+        sys.exit(1)
+
+    # 3. Process
+    out_dir = Path(args.output).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"\n>>> Output directory: {out_dir}")
+    
+    querier = dataset_query.DatasetQuery()
+    total = len(targets)
+    
+    print(f">>> Processing {total} datasets...\n")
+
+    for idx, (alias, dataset_path) in enumerate(targets.items(), 1):
+        print(f"[{idx}/{total}] Processing: {alias}")
+        files = querier.get_files(dataset_path)
+        
+        if files:
+            out_file = out_dir / f"{alias}.txt"
+            with open(out_file, "w") as f:
+                for path in files:
+                    f.write(path + "\n")
+            print(f"    -> Saved {len(files)} paths to '{out_file.name}'")
+        else:
+            print(f"    -> [Skip] No files found.")
+
+    print("\n" + "="*50)
+    print(" Job Finished.")
+    print("="*50)
+
+if __name__ == "__main__":
+    main()

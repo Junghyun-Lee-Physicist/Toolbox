@@ -15,3 +15,7 @@ pip-delete-this-directory.txt
 
 # Python virtual environment
 toolBoxVirEnv/
+
+# Output of get_file_lists module
+filelists/
+
