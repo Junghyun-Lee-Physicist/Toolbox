@@ -19,6 +19,28 @@ Toolbox/
 
 ## 🚀 Environment Setup
 
+### ⚠️ Important Note on Python Environment (HEP/CMS Context)
+
+In High Energy Physics environments (e.g., CERN LXPLUS, Tier-2 Clusters), environment variables can be fragile. Please be aware of the following potential issues:
+
+1.  **PYTHONPATH Sanitization:**
+    * Some secure shells or environment wrapper scripts (like complex `cmsenv` setups) may **reset or sanitize** `PYTHONPATH` upon initialization. This can cause the shell to "forget" the location of `lib/`.
+
+2.  **Python Version Mismatch (Shebang Issue):**
+    * If you run `source setup.sh` under **Python 3.6**, but the script's shebang (`#!/usr/bin/env python3`) triggers a newly loaded **Python 3.9** (e.g., from a newer CMSSW release), the `PYTHONPATH` set for 3.6 might be ignored or incompatible with 3.9.
+
+3.  **Virtual Environment Base:**
+    * A virtual environment inherits the properties of the Python executable used to create it.
+    * A venv created with **System Python** vs. **CMSSW Python** behaves differently. Mixing them (e.g., activating a system-based venv inside a CMSSW shell) often leads to library conflicts (binary incompatibility).
+
+> [!WARNING]
+> **Environment Loading Order is Critical!**
+>
+> You must execute `source setup.sh` **AFTER** establishing your base working environment (e.g., `cmsenv`, `source /cvmfs/...`).
+>
+> * **Correct:** `cmsenv` → `source setup.sh`
+> * **Incorrect:** `source setup.sh` → `cmsenv` (Your settings will be overwritten!)
+
 ### 1. Python Virtual Environment (Optional)
 
 To isolate dependencies, it is recommended to create a virtual environment.
